@@ -1,24 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <title>Cryptocurrency Dashboard</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        function updateDistributionChart(data) {
+            var trace = {
+                type: 'pie',
+                labels: data.labels,
+                values: data.values,
+                hoverinfo: 'label+percent'
+            };
+
+            var layout = {
+                title: 'Portfolio Distribution (in USDT)'
+            };
+
+            var config = {
+                responsive: true
+            };
+
+            var chartData = [trace];
+            Plotly.react('distributionChart', chartData, layout, config);
+        }
+
+        function updateTokensChart(data) {
+            var trace = {
+                type: 'bar',
+                x: data.labels,
+                y: data.values,
+                name: 'Token Quantities For Different Assets'
+            };
+
+            var layout = {
+                title: 'Tokens Distribution',
+                showlegend: false
+            };
+
+            var config = {
+                responsive: true
+            };
+
+            var chartData = [trace];
+            Plotly.react('tokensChart', chartData, layout, config);
+        }
+
+        function updateData() {
+            $.ajax({
+                url: '/data',
+                method: 'GET',
+                success: function (data) {
+                    $('#total_amount_usdt').text(data.total_amount_usdt);
+                    $('#total_amount_btc').text(data.total_amount_btc);
+                    $('#token_usdt_bnb').text(data.token_usdt_bnb);
+
+                    var distributionData = {
+                        labels: data.assets,
+                        values: data.assets_usdt
+                    };
+                    updateDistributionChart(distributionData);
+
+                    var tokensData = {
+                        labels: data.assets,
+                        values: data.values
+                    };
+                    updateTokensChart(tokensData);
+                }
+            });
+        }
+
+        setInterval(updateData, 5000);
+    </script>
+    <style>
+        #charts {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .chart-container {
+            flex: 1 1 50%;
+            min-width: 300px;
+            height: 400px;
+        }
+    </style>
 </head>
 <body>
-    <div>
-        {{ figure1 | safe }}
+    <h1>Portfolio Value (USDT): <span id="total_amount_usdt"></span></h1>
+    <h1>Portfolio Value (BTC): <span id="total_amount_btc"></span></h1>
+    <h1>BNB/USDT: <span id="token_usdt_bnb"></span></h1>
+
+    <div id="charts">
+        <div id="distributionChart" class="chart-container"></div>
+        <div id="tokensChart" class="chart-container"></div>
     </div>
-    <div>
-        {{ figure2 | safe }}
-    </div>
-    <div>
-        {{ figure3 | safe }}
-    </div>
-    <div>
-        {{ figure4 | safe }}
-    </div>
-    <div>
-        {{ figure5 | safe }}
-    </div>
+
 </body>
 </html>
