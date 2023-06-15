@@ -2,11 +2,14 @@ from flask import Flask, render_template, jsonify
 from binance.client import Client
 import configparser
 from binance.websockets import BinanceSocketManager
-from collect_data_csv import save_portfolio_to_csv
+from flask_sqlalchemy import SQLAlchemy
+
+from collect_data import *
 import time
 
 app = Flask(__name__, template_folder='templates')
-
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///portfolio.db'
+db = SQLAlchemy(app)
 
 config = configparser.ConfigParser()
 config.read_file(open('secret.cfg'))
