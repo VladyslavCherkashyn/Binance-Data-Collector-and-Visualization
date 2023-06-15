@@ -2,9 +2,11 @@ from flask import Flask, render_template, jsonify
 from binance.client import Client
 import configparser
 from binance.websockets import BinanceSocketManager
+from collect_data_csv import save_portfolio_to_csv
 import time
 
 app = Flask(__name__, template_folder='templates')
+
 
 config = configparser.ConfigParser()
 config.read_file(open('secret.cfg'))
@@ -14,93 +16,84 @@ test_secret_key = config.get('BINANCE', 'TEST_SECRET_KEY')
 client = Client(test_api_key, test_secret_key)
 client.API_URL = 'https://testnet.binance.vision/api'
 
-info = client.get_account()
 
-assets = []
-values = []
-for index in range(len(info['balances'])):
-    for key in info['balances'][index]:
-        if key == 'asset':
-            assets.append(info['balances'][index][key])
-        if key == 'free':
-            values.append(info['balances'][index][key])
+class CryptoPortfolio:
+    def __init__(self):
+        self.assets = []
+        self.values = []
+        self.token_usdt = {}
+        self.token_pairs = []
+        self.bm = None
 
-token_usdt = {}
-token_pairs = []
+    def populate_portfolio(self):
+        info = client.get_account()
+        for index in range(len(info['balances'])):
+            for key in info['balances'][index]:
+                if key == 'asset':
+                    self.assets.append(info['balances'][index][key])
+                if key == 'free':
+                    self.values.append(info['balances'][index][key])
 
-for token in assets:
-    if token != 'USDT':
-        token_pairs.append(token + 'USDT')
+        for token in self.assets:
+            if token != 'USDT':
+                self.token_pairs.append(token + 'USDT')
 
+    def start_streaming_data(self):
+        self.bm = BinanceSocketManager(client)
+        for tokenpair in self.token_pairs:
+            self.bm.start_symbol_ticker_socket(tokenpair, self.streaming_data_process)
+        self.bm.start()
+        time.sleep(5)
 
-def streaming_data_process(msg):
-    """
-    Function to process the received messages and add the latest token pair price
-    into the token_usdt dictionary
-    :param msg: input message
-    """
-    global token_usdt
-    token_usdt[msg['s']] = msg['c']
+    def streaming_data_process(self, msg):
+        self.token_usdt[msg['s']] = msg['c']
 
+    def total_amount_usdt(self):
+        total_amount = 0
+        for i, token in enumerate(self.assets):
+            if token != 'USDT':
+                total_amount += float(self.values[i]) * float(self.token_usdt[token + 'USDT'])
+            else:
+                total_amount += float(self.values[i]) * 1
+        return total_amount
 
-def total_amount_usdt(assets, values, token_usdt):
-    """
-    Function to calculate the total portfolio value in USDT
-    :param assets: Assets list
-    :param values: Assets quantity
-    :param token_usdt: Token pair price dict
-    :return: total value in USDT
-    """
-    total_amount = 0
-    for i, token in enumerate(assets):
-        if token != 'USDT':
-            total_amount += float(values[i]) * float(token_usdt[token + 'USDT'])
-        else:
-            total_amount += float(values[i]) * 1
-    return total_amount
+    def total_amount_btc(self):
+        total_amount = 0
+        for i, token in enumerate(self.assets):
+            if token != 'BTC' and token != 'USDT':
+                total_amount += float(self.values[i]) * float(self.token_usdt[token + 'USDT']) / float(
+                    self.token_usdt['BTCUSDT'])
+            if token == 'BTC':
+                total_amount += float(self.values[i]) * 1
+            else:
+                total_amount += float(self.values[i]) / float(self.token_usdt['BTCUSDT'])
+        return total_amount
 
+    def assets_usdt(self):
+        assets_in_usdt = []
+        for i, token in enumerate(self.assets):
+            if token != 'USDT':
+                assets_in_usdt.append(float(self.values[i]) * float(self.token_usdt[token + 'USDT']))
+            else:
+                assets_in_usdt.append(float(self.values[i]) * 1)
+        return assets_in_usdt
 
-def total_amount_btc(assets, values, token_usdt):
-    """
-    Function to calculate the total portfolio value in BTC
-    :param assets: Assets list
-    :param values: Assets quantity
-    :param token_usdt: Token pair price dict
-    :return: total value in BTC
-    """
-    total_amount = 0
-    for i, token in enumerate(assets):
-        if token != 'BTC' and token != 'USDT':
-            total_amount += float(values[i]) * float(token_usdt[token + 'USDT']) / float(token_usdt['BTCUSDT'])
-        if token == 'BTC':
-            total_amount += float(values[i]) * 1
-        else:
-            total_amount += float(values[i]) / float(token_usdt['BTCUSDT'])
-    return total_amount
-
-
-def assets_usdt(assets, values, token_usdt):
-    """
-    Function to convert all assets into the equivalent USDT value
-    :param assets: Assets list
-    :param values: Assets quantity
-    :param token_usdt: Token pair price dict
-    :return: list of asset values in USDT
-    """
-    assets_in_usdt = []
-    for i, token in enumerate(assets):
-        if token != 'USDT':
-            assets_in_usdt.append(float(values[i]) * float(token_usdt[token + 'USDT']))
-        else:
-            assets_in_usdt.append(float(values[i]) * 1)
-    return assets_in_usdt
+    def get_data(self):
+        data = {
+            'total_amount_usdt': self.total_amount_usdt(),
+            'total_amount_btc': self.total_amount_btc(),
+            'token_usdt_bnb': float(self.token_usdt['BNBUSDT']),
+            'assets': self.assets,
+            'assets_usdt': self.assets_usdt(),
+            'values': self.values
+        }
+        save_portfolio_to_csv(self.assets, self.values)
+        return data
 
 
-bm = BinanceSocketManager(client)
-for tokenpair in token_pairs:
-    conn_key = bm.start_symbol_ticker_socket(tokenpair, streaming_data_process)
-bm.start()
-time.sleep(5)
+portfolio = CryptoPortfolio()
+portfolio.populate_portfolio()
+portfolio.start_streaming_data()
 
 
 @app.route('/')
@@ -110,14 +103,7 @@ def index():
 
 @app.route('/data')
 def get_data():
-    data = {
-        'total_amount_usdt': total_amount_usdt(assets, values, token_usdt),
-        'total_amount_btc': total_amount_btc(assets, values, token_usdt),
-        'token_usdt_bnb': float(token_usdt['BNBUSDT']),
-        'assets': assets,
-        'assets_usdt': assets_usdt(assets, values, token_usdt),
-        'values': values
-    }
+    data = portfolio.get_data()
     return jsonify(data)
 
 
