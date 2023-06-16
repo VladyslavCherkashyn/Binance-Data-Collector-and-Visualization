@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request
 from binance.client import Client
 from binance.enums import KLINE_INTERVAL_1DAY, KLINE_INTERVAL_4HOUR, KLINE_INTERVAL_1HOUR
-import configparser
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import csv
@@ -10,11 +9,8 @@ import time
 
 app = Flask(__name__, template_folder='templates')
 
-config = configparser.ConfigParser()
-config.read_file(open('secret.cfg'))
-
-actual_api_key = config.get('BINANCE', 'ACTUAL_API_KEY')
-actual_secret_key = config.get('BINANCE', 'ACTUAL_SECRET_KEY')
+actual_api_key = os.getenv('ACTUAL_API_KEY')
+actual_secret_key = os.getenv('ACTUAL_SECRET_KEY')
 
 client = Client(actual_api_key, actual_secret_key)
 client.API_URL = 'https://api.binance.com/api'
