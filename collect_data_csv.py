@@ -1,7 +1,5 @@
 import csv
 import os
-from models import Portfolio
-from app import db
 
 
 def save_portfolio_to_csv(assets, values):
@@ -18,9 +16,9 @@ def save_portfolio_to_csv(assets, values):
             writer.writerow({'Asset': asset, 'Value': values[i]})
 
 
-def save_portfolio_to_db(assets, values):
-    for i, asset in enumerate(assets):
-        portfolio = Portfolio(asset=asset, value=values[i])
-        db.session.add(portfolio)
-
-    db.session.commit()
+# def save_portfolio_to_db(assets, values):
+#     for i, asset in enumerate(assets):
+#         portfolio = Portfolio(asset=asset, value=values[i])
+#         db.session.add(portfolio)
+#
+#     db.session.commit()

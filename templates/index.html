@@ -1,98 +1,65 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Trading Chart</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script>
-        function updateDistributionChart(data) {
-            var trace = {
-                type: 'pie',
-                labels: data.labels,
-                values: data.values,
-                hoverinfo: 'label+percent'
-            };
-
-            var layout = {
-                title: 'Portfolio Distribution (in USDT)'
-            };
-
-            var config = {
-                responsive: true
-            };
-
-            var chartData = [trace];
-            Plotly.react('distributionChart', chartData, layout, config);
-        }
-
-        function updateTokensChart(data) {
-            var trace = {
-                type: 'bar',
-                x: data.labels,
-                y: data.values,
-                name: 'Token Quantities For Different Assets'
-            };
-
-            var layout = {
-                title: 'Tokens Distribution',
-                showlegend: false
-            };
-
-            var config = {
-                responsive: true
-            };
-
-            var chartData = [trace];
-            Plotly.react('tokensChart', chartData, layout, config);
-        }
-
-        function updateData() {
-            $.ajax({
-                url: '/data',
-                method: 'GET',
-                success: function (data) {
-                    $('#total_amount_usdt').text(data.total_amount_usdt);
-                    $('#total_amount_btc').text(data.total_amount_btc);
-                    $('#token_usdt_bnb').text(data.token_usdt_bnb);
-
-                    var distributionData = {
-                        labels: data.assets,
-                        values: data.assets_usdt
-                    };
-                    updateDistributionChart(distributionData);
-
-                    var tokensData = {
-                        labels: data.assets,
-                        values: data.values
-                    };
-                    updateTokensChart(tokensData);
-                }
-            });
-        }
-
-        setInterval(updateData, 5000);
-    </script>
-    <style>
-        #charts {
-            display: flex;
-            flex-wrap: wrap;
-        }
-
-        .chart-container {
-            flex: 1 1 50%;
-            min-width: 300px;
-            height: 400px;
-        }
-    </style>
 </head>
 <body>
-    <h1>Portfolio Value (USDT): <span id="total_amount_usdt"></span></h1>
-    <h1>Portfolio Value (BTC): <span id="total_amount_btc"></span></h1>
-    <h1>BNB/USDT: <span id="token_usdt_bnb"></span></h1>
+    <h1>Trading Chart - {{ symbol }}</h1>
+    <form action="/" method="post">
+        <label for="symbol">Trading Pair:</label>
+        <select name="symbol" id="symbol">
+            <option value="BTCUSDT" {% if symbol == 'BTCUSDT' %}selected{% endif %}>BTC/USDT</option>
+            <option value="BNBUSDT" {% if symbol == 'BNBUSDT' %}selected{% endif %}>BNB/USDT</option>
+            <option value="ETHUSDT" {% if symbol == 'ETHUSDT' %}selected{% endif %}>ETH/USDT</option>
+        </select>
+        <br>
+        <label for="interval">Interval:</label>
+        <select name="interval" id="interval">
+            <option value="1d" {% if interval == '1d' %}selected{% endif %}>1 Day</option>
+            <option value="4h" {% if interval == '4h' %}selected{% endif %}>4 Hours</option>
+            <option value="1h" {% if interval == '1h' %}selected{% endif %}>1 Hour</option>
+        </select>
+        <br>
+        <input type="submit" value="Show Chart">
+    </form>
 
-    <div id="charts">
-        <div id="distributionChart" class="chart-container"></div>
-        <div id="tokensChart" class="chart-container"></div>
-    </div>
+    <div id="chart"></div>
 
+    <script>
+        var candlestickData = JSON.parse('{{ candlestick_data|tojson|safe }}');
+
+        var trace = {
+            x: candlestickData.timestamps,
+            close: candlestickData.close,
+            decreasing: {line: {color: '#FF0000'}},
+            high: candlestickData.high,
+            increasing: {line: {color: '#008000'}},
+            line: {color: 'rgba(31,119,180,1)'},
+            low: candlestickData.low,
+            open: candlestickData.open,
+            type: 'candlestick',
+            xaxis: 'x',
+            yaxis: 'y'
+        };
+
+        var data = [trace];
+
+        var layout = {
+            title: 'Trading Chart',
+            xaxis: {
+                rangeslider: {
+                    visible: false
+                },
+                type: 'date'
+            },
+            yaxis: {
+                autorange: true,
+                type: 'linear'
+            }
+        };
+
+        Plotly.newPlot('chart', data, layout);
+    </script>
 </body>
 </html>
