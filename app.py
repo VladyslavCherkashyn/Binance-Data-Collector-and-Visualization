@@ -1,9 +1,12 @@
 from flask import Flask, render_template, request
 from binance.client import Client
-import configparser
 from binance.enums import KLINE_INTERVAL_1DAY, KLINE_INTERVAL_4HOUR, KLINE_INTERVAL_1HOUR
+import configparser
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+import csv
+import os
+import time
 
 app = Flask(__name__, template_folder='templates')
 
@@ -21,6 +24,44 @@ symbol_interval_mapping = {
     'BNBUSDT': KLINE_INTERVAL_4HOUR,
     'ETHUSDT': KLINE_INTERVAL_1HOUR
 }
+
+csv_file = os.path.join(os.path.dirname(__file__), 'crypto_info', 'data.csv')
+
+
+def save_to_csv(candlestick_data):
+    with open(csv_file, 'a', newline='') as file:
+        writer = csv.writer(file)
+
+        is_empty = file.tell() == 0
+
+        if is_empty:
+            writer.writerow(['Timestamp', 'Open', 'High', 'Low', 'Close'])
+
+        for i in range(len(candlestick_data['timestamps'])):
+            row = [
+                candlestick_data['timestamps'][i],
+                candlestick_data['open'][i],
+                candlestick_data['high'][i],
+                candlestick_data['low'][i],
+                candlestick_data['close'][i]
+            ]
+            writer.writerow(row)
+
+
+def update_last_update_time(symbol, current_time):
+    with open(csv_file, 'a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([symbol, current_time])
+
+
+def get_last_update_time():
+    try:
+        with open(csv_file, 'r') as file:
+            reader = csv.reader(file)
+            last_row = list(reader)[-1]
+            return float(last_row[1])
+    except (FileNotFoundError, IndexError):
+        return 0.0
 
 
 def get_candlestick_data(symbol, interval):
@@ -87,19 +128,35 @@ def create_candlestick_chart(symbol, data):
     return fig
 
 
+def save_to_csv_if_needed(symbol, interval, save_interval=3600):
+    last_update_time = get_last_update_time()
+
+    current_time = time.time()
+    if current_time - last_update_time >= save_interval:
+        candlestick_data = get_candlestick_data(symbol, interval)
+        save_to_csv(candlestick_data)
+        update_last_update_time(symbol, current_time)
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
         symbol = request.form['symbol']
         interval = request.form['interval']
+        if 'save_interval' in request.form:
+            save_interval = int(request.form['save_interval'])
+        else:
+            save_interval = 3600
     else:
         symbol = 'BTCUSDT'
         interval = KLINE_INTERVAL_1DAY
+        save_interval = 3600
 
     candlestick_data = get_candlestick_data(symbol, symbol_interval_mapping[symbol])
     chart = create_candlestick_chart(symbol, candlestick_data)
 
-    # Convert the chart to HTML code for embedding in the template
+    save_to_csv_if_needed(symbol, interval, save_interval)
+
     chart_html = chart.to_html(full_html=False)
 
     return render_template('index.html', chart=chart_html, symbol=symbol, interval=interval, candlestick_data=candlestick_data)

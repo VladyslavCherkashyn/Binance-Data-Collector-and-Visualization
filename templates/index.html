@@ -21,6 +21,9 @@
             <option value="1h" {% if interval == '1h' %}selected{% endif %}>1 Hour</option>
         </select>
         <br>
+        <label for="save_interval">Save Interval (seconds):</label>
+        <input type="number" name="save_interval" id="save_interval" value="{{ save_interval }}" required>
+        <br>
         <input type="submit" value="Show Chart">
     </form>
 
