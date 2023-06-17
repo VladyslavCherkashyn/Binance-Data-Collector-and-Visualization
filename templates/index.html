@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>Trading Chart</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -26,7 +26,6 @@
         <br>
         <input type="submit" value="Show Chart">
     </form>
-
     <div id="chart"></div>
 
     <script>
@@ -48,13 +47,21 @@
 
         var data = [trace];
 
+        var tickFormat = '';
+
+        if ('{{ interval }}' === '1d') {
+            tickFormat = '%Y-%m-%d';
+        } else if ('{{ interval }}' === '4h' || '{{ interval }}' === '1h') {
+            tickFormat = '%H:%M';
+        }
+
         var layout = {
-            title: 'Trading Chart',
+            title: 'Trading Chart - {{ symbol }}',
             xaxis: {
                 rangeslider: {
                     visible: false
                 },
-                type: 'date'
+                tickformat: tickFormat
             },
             yaxis: {
                 autorange: true,
