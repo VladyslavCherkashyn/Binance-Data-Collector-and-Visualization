@@ -1,0 +1,4 @@
+venv
+crypto_info
+secret.cfg
+.env
